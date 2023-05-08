@@ -3,7 +3,7 @@ import Head from "next/head";
 import MicRecorder from "mic-recorder-to-mp3";
 import * as Tone from "tone";
 import { Player } from "tone";
-import { Pitch } from "aubiojs";
+import aubio, { Pitch } from "aubiojs";
 import { ClipLoader } from "react-spinners";
 import Container from "../components/Container";
 import Button from "../components/Button";
@@ -20,7 +20,7 @@ declare global {
 function Home() {
   const [recording, setRecording] = useState(false);
   const [tempo, setTempo] = useState(120);
-  const [beats, setBeats] = useState(4);
+  const [beats, setBeats] = useState<number>(4);
   const [key, setKey] = useState("C");
   const [instrument, setInstrument] = useState("piano");
   const [recordedBuffer, setRecordedBuffer] = useState<AudioBuffer | null>(null);
@@ -119,7 +119,9 @@ function Home() {
     if (!buffer) return;
     try {
       const sampleRate = buffer.sampleRate;
-      const pitchDetect = new Pitch("yin", 2048, 1024, sampleRate);
+      const pitchDetect = await aubio().then(({ Pitch }) => {
+        return new Pitch("yin", 2048, 1024, sampleRate);
+      });
 
       const channelData = buffer.getChannelData(0);
       const frameSize = 1024;
@@ -180,21 +182,25 @@ function Home() {
     }
   };
 
-  const handleTempoChange = (value: string): void => {
-    setTempo(value);
-    // Add your tempo change logic here
+  const handleTempoChange = (value: string | number): void => {
+    const newTempo = parseInt(value.toString());
+    setTempo(newTempo);
+    console.log(`Tempo changed to: ${newTempo}`);
+    // Add your custom tempo change logic here
   };
 
-  const handleBeatsChange = (value: string): void => {
-    setBeats(value);
-    // Add your beats change logic here
+  const handleBeatsChange = (value: string | number): void => {
+    const newBeats = parseInt(value.toString());
+    setBeats(newBeats);
+    console.log(`Beats changed to: ${newBeats}`);
+    // Add your custom beats change logic here
   };
 
-  const handleKeyChange = (value: string): void => {
+  const handleKeyChange = (value: string | number): void => {
+    const newValue = parseInt(value.toString());
     setKey(value as MusicalKey);
     // Add your key change logic here
   };
-
 
   const handleExport = (): void => {
     if (synthesizedBuffer) {
@@ -220,12 +226,13 @@ function Home() {
       <Container>
         <h1 className="text-4xl font-bold mb-8">Hum to Instrument Transformer</h1>
         <Button onClick={handleRecord}>{recording ? "Stop" : "Record"}</Button>
-        <Dropdown label="Tempo" options={[60, 90, 120, 140]} onChange={handleTempoChange} />
-        <Dropdown label="Beats" options={[2, 3, 4, 6]} onChange={handleBeatsChange} />
-        <Dropdown label="Key" options={["C", "D", "E", "F", "G", "A", "B"]} onChange={handleKeyChange} />
+        <Dropdown label="Tempo" options={[60, 90, 120, 140]} value={tempo} onChange={handleTempoChange} />
+        <Dropdown label="Beats" options={[2, 3, 4, 6]} value={beats} onChange={handleBeatsChange} />
+        <Dropdown label="Key" options={["C", "D", "E", "F", "G", "A", "B"]} value={key} onChange={handleKeyChange} />
         <Dropdown
           label="Instrument"
           options={["piano", "guitar", "violin", "flute", "saxophone"]}
+          value={instrument}
           onChange={handleInstrumentChange}
         />
         <Button onClick={handleExport}>Export</Button>
