@@ -1,6 +1,10 @@
-// components/Container.js
+import React from 'react';
 
-const Container = ({ children }) => {
+type ContainerProps = {
+  children: React.ReactNode;
+};
+
+const Container: React.FC<ContainerProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
       <div className="relative py-3 sm:max-w-xl mx-auto text-center">

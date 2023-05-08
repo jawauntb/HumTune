@@ -1,66 +1,122 @@
-import { useState } from "react"
-import Head from "next/head"
-import MicRecorder from "mic-recorder-to-mp3"
-import * as Tone from "tone"
-import { Player } from "tone"
-import { Pitch } from "aubiojs"
-import { ClipLoader } from "react-spinners"
-import { Container, Button, Dropdown } from "../components"
+import React, { useState } from "react";
+import Head from "next/head";
+import MicRecorder from "mic-recorder-to-mp3";
+import * as Tone from "tone";
+import { Player } from "tone";
+import { Pitch } from "aubiojs";
+import { ClipLoader } from "react-spinners";
+import Container from "../components/Container";
+import Button from "../components/Button";
+import Dropdown from "../components/Dropdown";
 
-export default function Home() {
+export type Instrument = "piano" | "guitar" | "violin" | "flute" | "saxophone";
+export type MusicalKey = "C" | "C#" | "D" | "D#" | "E" | "F" | "F#" | "G" | "G#" | "A" | "A#" | "B";
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+function Home() {
   const [recording, setRecording] = useState(false);
   const [tempo, setTempo] = useState(120);
   const [beats, setBeats] = useState(4);
   const [key, setKey] = useState("C");
   const [instrument, setInstrument] = useState("piano");
-  const [recordedBuffer, setRecordedBuffer] = useState(null);
-  const [synthesizedBuffer, setSynthesizedBuffer] = useState(null);
+  const [recordedBuffer, setRecordedBuffer] = useState<AudioBuffer | null>(null);
+  const [synthesizedBuffer, setSynthesizedBuffer] = useState<AudioBuffer | null>(null);
   const [processing, setProcessing] = useState(false);
 
 
   const Mp3Recorder = new MicRecorder({ bitRate: 128 });
 
-  const synthesizeInstrument = async (inputBuffer, instrument, key, scale) => {
+  const synthesizeInstrument = async (
+    inputBuffer: AudioBuffer | null,
+    instrument: Instrument,
+    key: MusicalKey,
+    scale: string
+  ): Promise<AudioBuffer | null> => {
+    if (!inputBuffer) return null;
     // Adjust the inputBuffer based on the key and scale
 
     const player = new Tone.Player(inputBuffer);
     const synth = new Tone.Synth().toDestination();
-    const notes = []; // Extract notes from the inputBuffer using Tone.js
+    const notes: string[] = []; // Extract notes from the inputBuffer using Tone.js
 
     // Play the notes using the synth
     for (let note of notes) {
       synth.triggerAttackRelease(note, "8n");
-      await Tone.Draw.wait("8n");
+      await new Promise<void>((resolve) => {
+        Tone.Transport.scheduleOnce(() => {
+          resolve();
+        }, "8n");
+      });
+    }
+
+    // Synthesize the instrument
+    const sampler = new Tone.Sampler({
+      urls: {
+        [instrument]: `/instruments/${instrument}.mp3`,
+      },
+      onload: () => {
+        sampler.releaseAll();
+      },
+    }).toDestination();
+
+    const offlineContext = new OfflineAudioContext(player.buffer.numberOfChannels, player.buffer.duration * player.buffer.sampleRate, player.buffer.sampleRate);
+    const offlinePlayer = new Tone.Player(inputBuffer).connect(offlineContext.destination);
+    offlinePlayer.start();
+    const renderedBuffer = await offlineContext.startRendering();
+
+    for (let i = 0; i < player.buffer.duration; i += 0.1) {
+      const note = notes[Math.floor(i * notes.length / player.buffer.duration)];
+      const frequency = Tone.Frequency(note).toFrequency();
+      sampler.triggerAttackRelease(frequency, "0.1", i);
+      (await new Promise((resolve) => {
+        (Tone.Transport as any).scheduleOnce(() => {
+          resolve();
+        }, "0.1", `+${i}`);
+      })) as void;
+    }
+
+    return renderedBuffer;
+  };
+
+  const handleInstrumentChange = async (value: string): Promise<void> => {
+    setInstrument(value as Instrument);
+    if (recordedBuffer) {
+      const synthesizedBuffer = await synthesizeInstrument(recordedBuffer, value as Instrument, key as MusicalKey, "major");
+      if (synthesizedBuffer) {
+        setSynthesizedBuffer(synthesizedBuffer);
+        // Play the synthesizedBuffer
+      }
     }
   };
 
-
-  const getAveragePitch = (pitchArray) => {
+  const getAveragePitch = (pitchArray: number[]): number => {
     const filteredPitches = pitchArray.filter((pitch) => pitch !== -1);
     const totalPitches = filteredPitches.reduce((sum, pitch) => sum + pitch, 0);
     return totalPitches / filteredPitches.length;
   };
 
-  const getKeyFromPitch = (pitch) => {
+  const getKeyFromPitch = (pitch: number): MusicalKey => {
     const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
     const midiNumber = Math.round(12 * (Math.log2(pitch / 440)) + 69);
-    return noteStrings[midiNumber % 12];
+    return noteStrings[midiNumber % 12] as MusicalKey;
   };
 
-
-
-  const detectTempo = async (audioBuffer) => {
-    const buffer = new Buffer.fromArrayBuffer(audioBuffer);
-    const player = new Player(buffer);
+  const detectTempo = async (audioBuffer: AudioBuffer | null): Promise<number> => {
+    if (!audioBuffer) return 0;
+    const toneAudioBuffer = new Tone.ToneAudioBuffer(audioBuffer);
+    const player = new Player(toneAudioBuffer);
     await player.sync().start(0);
     const bpm = await Tone.Transport.bpm.value;
     player.dispose();
     return bpm;
   };
 
-
-
-  const analyzePitchAndKey = async (buffer) => {
+  const analyzePitchAndKey = async (buffer: AudioBuffer | null): Promise<void> => {
+    if (!buffer) return;
     try {
       const sampleRate = buffer.sampleRate;
       const pitchDetect = new Pitch("yin", 2048, 1024, sampleRate);
@@ -90,15 +146,12 @@ export default function Home() {
     }
   };
 
-
-  const bufferToAudioBuffer = async (arrayBuffer) => {
+  const bufferToAudioBuffer = async (arrayBuffer: ArrayBuffer): Promise<AudioBuffer> => {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     return await audioContext.decodeAudioData(arrayBuffer);
   };
 
-
-
-  const handleRecord = () => {
+  const handleRecord = (): void => {
     if (!recording) {
       Mp3Recorder.start()
         .then(() => {
@@ -127,33 +180,23 @@ export default function Home() {
     }
   };
 
-
-
-  const handleTempoChange = (value) => {
+  const handleTempoChange = (value: string): void => {
     setTempo(value);
     // Add your tempo change logic here
   };
 
-  const handleBeatsChange = (value) => {
+  const handleBeatsChange = (value: string): void => {
     setBeats(value);
     // Add your beats change logic here
   };
 
-  const handleKeyChange = (value) => {
-    setKey(value);
+  const handleKeyChange = (value: string): void => {
+    setKey(value as MusicalKey);
     // Add your key change logic here
   };
 
-  const handleInstrumentChange = async (value) => {
-    setInstrument(value);
-    if (recordedBuffer) {
-      const synthesizedBuffer = await synthesizeInstrument(recordedBuffer, value, key);
-      // Play the synthesizedBuffer
-    }
-  };
 
-
-  const handleExport = () => {
+  const handleExport = (): void => {
     if (synthesizedBuffer) {
       const buffer = synthesizedBuffer;
       const blob = new Blob([buffer], { type: "audio/mp3" });
@@ -166,8 +209,6 @@ export default function Home() {
       alert("No synthesized audio to export.");
     }
   };
-
-
 
   return (
     <div>
@@ -199,3 +240,5 @@ export default function Home() {
     </div>
   );
 }
+
+export default Home
