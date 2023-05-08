@@ -4,7 +4,7 @@ type DropdownProps = {
   label?: string | null;
   options: string[] | number[];
   value: string | number;
-  onChange: (value: string | number) => void;
+  onChange: (value: any) => void;
 };
 
 const Dropdown: React.FC<DropdownProps> = ({ label, options, value, onChange }) => {
