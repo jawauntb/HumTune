@@ -144,7 +144,7 @@ function Home() {
       setTempo(tempo);
     } catch (error) {
       console.error(error);
-      alert("Error analyzing pitch and key: " + error.message);
+      alert("Error analyzing pitch and key: " + error);
     }
   };
 
@@ -161,7 +161,7 @@ function Home() {
         })
         .catch((error) => {
           console.error(error);
-          alert("Error starting recording: " + error.message);
+          alert("Error starting recording: " + error);
         });
     } else {
       setProcessing(true);
@@ -176,7 +176,7 @@ function Home() {
         })
         .catch((error) => {
           console.error(error);
-          alert("Error stopping recording: " + error.message);
+          alert("Error stopping recording: "  + error);
           setProcessing(false);
         });
     }
