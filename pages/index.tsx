@@ -1,12 +1,11 @@
-import { useState } from "react";
-import Head from "next/head";
-import MicRecorder from "mic-recorder-to-mp3";
-import * as Tone from "tone";
-import { Player } from "tone";
-import { Pitch } from "aubiojs";
-import { ClipLoader } from "react-spinners";
-import { Container, Button, Dropdown } from "../components";
-
+import { useState } from "react"
+import Head from "next/head"
+import MicRecorder from "mic-recorder-to-mp3"
+import * as Tone from "tone"
+import { Player } from "tone"
+import { Pitch } from "aubiojs"
+import { ClipLoader } from "react-spinners"
+import { Container, Button, Dropdown } from "../components"
 
 export default function Home() {
   const [recording, setRecording] = useState(false);
