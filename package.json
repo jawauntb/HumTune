@@ -9,9 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tonejs/midi": "^2.0.28",
+    "aubiojs": "^0.2.1",
+    "mic-recorder-to-mp3": "^2.2.2",
+    "mp3-mediarecorder": "^4.0.5",
     "next": "12.2.0",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-spinners": "^0.13.8",
+    "tone": "^14.7.77"
   },
   "devDependencies": {
     "@types/node": "18.0.1",
